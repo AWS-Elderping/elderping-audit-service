@@ -10,10 +10,13 @@ const createEvent = async (req, res) => {
       actorId, actorEmail, actorRole, action, resource, resourceId, metadata, ipAddress, userAgent 
     } = req.body;
 
-    // Use JWT user values if authenticated, fallback to body values (for internal service token)
-    const actor_id = req.user?.userId || req.user?.id || actorId || 'SYSTEM';
-    const actor_email = req.user?.email || actorEmail || 'system@elderpinq.com';
-    const actor_role = req.user?.role || actorRole || 'SYSTEM';
+    // Use JWT user values if authenticated via a real user token, fallback to body values.
+    // Requests authenticated via the internal system token get a synthetic SYSTEM req.user
+    // (see authenticateAudit) which must not override the real actor passed in the body.
+    const isSystemCall = req.user?.role === 'SYSTEM';
+    const actor_id = (!isSystemCall && (req.user?.userId || req.user?.id)) || actorId || 'SYSTEM';
+    const actor_email = (!isSystemCall && req.user?.email) || actorEmail || 'system@elderpinq.com';
+    const actor_role = (!isSystemCall && req.user?.role) || actorRole || 'SYSTEM';
 
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const clientUserAgent = req.headers['user-agent'];
