@@ -43,6 +43,28 @@ app.use('/audit', auditRoutes);
 
 const PORT = process.env.PORT || 3000;
 
+async function initDb() {
+  const pool = AuditModel.getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id          SERIAL PRIMARY KEY,
+      actor_id    VARCHAR(100),
+      actor_email VARCHAR(255),
+      actor_role  VARCHAR(50),
+      action      VARCHAR(100) NOT NULL,
+      resource    VARCHAR(100) NOT NULL,
+      resource_id VARCHAR(100),
+      metadata    JSONB,
+      ip_address  VARCHAR(100),
+      user_agent  TEXT,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS audit_events_created_at_idx ON audit_events (created_at DESC)');
+  await pool.query('CREATE INDEX IF NOT EXISTS audit_events_actor_id_idx ON audit_events (actor_id)');
+  console.log('Database schema ready (audit_events).');
+}
+
 async function start() {
   const pool = AuditModel.getPool();
   let retries = 5;
@@ -51,6 +73,7 @@ async function start() {
     try {
       await pool.query('SELECT 1');
       console.log('✅ Connected to Audit database successfully.');
+      await initDb();
       break;
     } catch (err) {
       console.log(`⏳ Waiting for database… (${retries} retries left) error: ${err.message}`);
